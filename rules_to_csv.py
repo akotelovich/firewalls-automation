@@ -95,7 +95,7 @@ def main():
     else:
         raise SystemExit(1)
 
-    a = ["name", "uuid", "srcaddr", "dstaddr", "action", "status", "service", "comments"]
+    a = ["id", "name", "uuid", "srcaddr", "dstaddr", "action", "status", "service", "comments"]
     net_connect = ConnectHandler(
         device_type = "fortinet",
         host = args.hostname[0],
@@ -105,8 +105,7 @@ def main():
         global_delay_factor = 2
         #,session_log="output.txt"
     )
-
-    output = ""
+    
     if (args.vdom[0]):
         o = net_connect.send_command ("config vdom", expect_string=r"#")
         o = net_connect.send_command ("edit {}".format(args.vdom[0]), expect_string=r"\) \#")
