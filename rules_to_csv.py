@@ -62,9 +62,9 @@ def parse_and_print(t, a):
 
 
 def main():
-    parser = argparse.ArgumentParser(prog='PROG',
+    parser = argparse.ArgumentParser(prog='rules_to_csv.py',
                         usage='%(prog)s --host <hostname> [--vdom <vdom name>] --user <username> --passwd <password> | --ask-password | --passwd-env <ENV-VAR>',
-                        description="Retrieve rules from firewall")
+                        description="Retrieve rules from firewall into CSV data")
     parser.add_argument("--hostname", nargs=1, required=True,
                         help="hostname")
     parser.add_argument("--username", nargs=1, required=True,
