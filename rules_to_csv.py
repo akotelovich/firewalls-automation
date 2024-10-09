@@ -96,23 +96,30 @@ def main():
         raise SystemExit(1)
 
     a = ["id", "name", "uuid", "srcaddr", "dstaddr", "action", "status", "service", "comments"]
-    net_connect = ConnectHandler(
-        device_type = "fortinet",
-        host = args.hostname[0],
-        username = args.username[0],
-        password = dev_passwd,
-        fast_cli = False,
-        global_delay_factor = 2
-        #,session_log="output.txt"
-    )
+    try:
+        net_connect = ConnectHandler(
+            device_type = "fortinet",
+            host = args.hostname[0],
+            username = args.username[0],
+            password = dev_passwd,
+            fast_cli = False,
+            global_delay_factor = 2
+            #,session_log="output.txt"
+            )
     
-    if (args.vdom[0]):
-        o = net_connect.send_command ("config vdom", expect_string=r"#")
-        o = net_connect.send_command ("edit {}".format(args.vdom[0]), expect_string=r"\) \#")
+        if (args.vdom[0]):
+            o = net_connect.send_command ("config vdom", expect_string=r"#")
+            o = net_connect.send_command ("edit {}".format(args.vdom[0]), expect_string=r"\) \#")
 
-    t = net_connect.send_command("show full-configuration firewall policy", expect_string=r"\) \#")
-    net_connect.send_command("end \n ",expect_string=r"#",read_timeout=90)
-    net_connect.disconnect()
+        t = net_connect.send_command("show full-configuration firewall policy", expect_string=r"\) \#")
+        net_connect.send_command("end \n ",expect_string=r"#",read_timeout=90)
+    except NetmikoTimeoutException:
+        print ("Could not connect to {}".format(args.hostname[0]))
+    except NetmikoAuthenticationException:
+        print ("User {} login was not successful".format(args.username[0])
+    finally:
+        if 'net_connect' in locals():
+            net_connect.disconnect()
 
     #join multiline comments into one line
     t = re.sub(r"^(set comments )\"([^\"]*)\"$", convert_str, t, flags=re.M)
