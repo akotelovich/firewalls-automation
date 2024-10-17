@@ -116,7 +116,7 @@ def main():
     except NetmikoTimeoutException:
         print ("Could not connect to {}".format(args.hostname[0]))
     except NetmikoAuthenticationException:
-        print ("User {} login was not successful".format(args.username[0])
+        print ("User {} login was not successful".format(args.username[0]))
     finally:
         if 'net_connect' in locals():
             net_connect.disconnect()
