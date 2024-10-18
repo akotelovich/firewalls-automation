@@ -4,7 +4,8 @@ import getpass
 from netmiko import fortinet
 from netmiko import ConnectHandler
 import argparse
-
+import csv
+import sys
 
 def convert_str(match_obj):
     if match_obj.group(1) is not None and match_obj.group(2) is not None:
@@ -54,7 +55,7 @@ def parse_fw_policy(t, a):
 
         # block inside edit xxx...next
         for i in a:
-            res = re.search(r"set "+i+"\s+(.+)", l)
+            res = re.search(r"set "+ i +"\s+(.+)", l)
             if res:
                 col.append(res.group(1))
 
@@ -65,20 +66,14 @@ def main():
     parser = argparse.ArgumentParser(prog='rules_to_csv.py',
                                      usage='%(prog)s --host <hostname> [--vdom <vdom name>] --user <username> --passwd <password> | --ask-password | --passwd-env <ENV-VAR>',
                                      description="Retrieve rules from firewall into CSV data")
-    parser.add_argument("--hostname", nargs=1, required=True,
-                        help="hostname")
-    parser.add_argument("--username", nargs=1, required=True,
-                        help="username")
-    parser.add_argument("--vdom", nargs=1,
-                        help="vdom")
-
+    parser.add_argument("-d", "--hostname", nargs=1, required=True, help="hostname")
+    parser.add_argument("-u", "--username", nargs=1, required=True, help="username")
+    parser.add_argument("-f", "--outfile", nargs=1, help="output csv file")
+    parser.add_argument("-v", "--vdom", nargs=1, help="Fortigate vdom")
     group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument("--ask_password", action='store_true',
-                       help="ask password")
-    group.add_argument("--password", nargs=1,
-                       help="password")
-    group.add_argument("--password_env", nargs=1,
-                       help="password environment variable")
+    group.add_argument("-a", "--ask_password", action='store_true', help="ask password")
+    group.add_argument("-p", "--password", nargs=1, help="password from command line")
+    group.add_argument("-e", "--password_env", nargs=1, help="password from environment variable")
 
     args = parser.parse_args()
 
@@ -104,7 +99,7 @@ def main():
             password = dev_passwd,
             fast_cli = False,
             global_delay_factor = 2
-            ,session_log="output.txt"
+            #,session_log="output.txt"
         )
 
         if (args.vdom[0]):
@@ -116,13 +111,16 @@ def main():
         #join multiline comments into one line
         txt_fw_policy = re.sub(r"^(set comments )\"([^\"]*)\"$", convert_str, txt_fw_policy, flags=re.M)
 
+        #normalize quotation symbols
+        txt_fw_policy = re.sub(r"\"", "'", txt_fw_policy, flags=re.M)
+
         arr_policies = parse_fw_policy (txt_fw_policy, data_to_parse)
 
         data_to_parse.append('packets')
         data_to_parse.append('hits')
         data_to_parse.append('first_hit')
         data_to_parse.append('last_hit')
-        print(data_to_parse)
+
         for i in range(0, len(arr_policies)):
             raw_counters = net_connect.send_command("diagnose firewall iprope show 00100004 " + arr_policies[i][0], expect_string=r"\) \#")
             packets = re.search(r"pkts/bytes=([^\/]+)", raw_counters)
@@ -134,7 +132,7 @@ def main():
             else:
                 arr_policies[i].append('0')
 
-            first_last_hit = re.search(r"first:(.+)last:(.+)", raw_counters)
+            first_last_hit = re.search(r"first:(.+) last:(.+)", raw_counters)
             if (first_last_hit):
                 arr_policies[i].append(first_last_hit.group(1))
                 arr_policies[i].append(first_last_hit.group(2))
@@ -142,23 +140,30 @@ def main():
                 arr_policies[i].append('0')
                 arr_policies[i].append('0')
 
-            print(arr_policies[i])
+            #DEBUG: print(arr_policies[i])
         net_connect.send_command("end \n ",expect_string=r"#",read_timeout=90)
+
+        if (args.outfile):
+            with open(args.outfile[0], "w+", newline='') as out_csv:
+                csv_wr = csv.writer(out_csv, delimiter=',')
+                csv_wr.writerow(data_to_parse)
+                csv_wr.writerows(arr_policies)
+                print("Saved to {}".format(args.outfile[0]))
+        else:
+            csv_wr = csv.writer(sys.stdout, delimiter=',')
+            csv_wr.writerow(data_to_parse)
+            csv_wr.writerows(arr_policies)
 
     except NetmikoTimeoutException:
         print ("Could not connect to {}".format(args.hostname[0]))
     except NetmikoAuthenticationException:
         print ("User {} login was not successful".format(args.username[0]))
+    except PermissionError:
+        print ("Could not save the data")
     finally:
         if 'net_connect' in locals():
             net_connect.disconnect()
 
-
-
-    #TODO: save to file
-    #backup_file = open("backup-config-firewall/" + "-root.txt", "w+")
-    #backup_file.write(t)
-    #print("Saved to " + fileName + ".txt")
     return None
 
 
